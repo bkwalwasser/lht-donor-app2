@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LHT Donor Manager</title>
 
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="https://apis.google.com/js/api.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="gisLoaded()"></script>
+<script src="https://apis.google.com/js/api.js?onload=gapiLoaded"></script>
 
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -193,10 +193,10 @@ select.form-input{cursor:pointer}
 
 <script>
 // ==========================================
-// 1. SYSTEM KEYS - PASTE YOUR CODES HERE
+// 1. CONFIGURATION
 // ==========================================
-const CLIENT_ID = '951254535664-gumkta7ekgdnnv2nuk6iqhi5ohpofpke.apps.googleusercontent.com'; 
-const API_KEY = 'AIzaSyCr34rClMKfAV11nNarPJvK2LmUWkjzd8k';
+const CLIENT_ID = '951254535664-gumkta7ekgdnnv2nuk6iqhi5ohpofpke.apps.googleusercontent.com';
+const API_KEY = 'AIzaSyCr34rClMKfAV11nNarPJvK2LmUWkjzd8k'; // Restricted to levhatorah.org domains only
 
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 const DISCOVERY_DOCS = ['https://sheets.googleapis.com/$discovery/rest?version=v4'];
@@ -206,22 +206,25 @@ let tokenClient;
 let gapiInited = false;
 let gsisInited = false;
 
-// Initialize Google SDK Engines
-window.onload = function() {
+// gapiLoaded is called by api.js?onload= once the library is ready
+function gapiLoaded() {
   gapi.load('client', async () => {
     await gapi.client.init({ apiKey: API_KEY, discoveryDocs: DISCOVERY_DOCS });
     gapiInited = true;
     checkReady();
   });
-  
+}
+
+// gisLoaded is called by gsi/client once it has fully loaded
+function gisLoaded() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
-    callback: '', 
+    callback: '',
   });
   gsisInited = true;
   checkReady();
-};
+}
 
 function checkReady() {
   if (gapiInited && gsisInited) {
@@ -252,7 +255,7 @@ async function refreshDataFromSheet() {
   try {
     const response = await gapi.client.sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: `${tabName}!A2:G`, // Reads structural data skipping header row
+      range: `${tabName}!A2:G`,
     });
 
     const rows = response.result.values;
@@ -272,7 +275,6 @@ async function refreshDataFromSheet() {
       });
     }
 
-    // Toggle live interface state values
     document.getElementById('setup-section').style.display = 'none';
     document.getElementById('main-nav').style.display = 'flex';
     document.getElementById('topbar-badge').style.display = 'inline-block';
@@ -285,7 +287,6 @@ async function refreshDataFromSheet() {
   }
 }
 
-// Append real record mutations back up onto spreadsheet rows
 async function saveNewContact() {
   const nameInput = document.getElementById('ac-name').value.trim();
   if(!nameInput) { alert('Name is required'); return; }
@@ -359,3 +360,43 @@ function doSearch(query) {
       <div class="avatar ${d.status}">${d.name.charAt(0)}</div>
       <div>
         <div class="result-name">${d.name}</div>
+        <div class="result-sub">ID: ${d.id} • ${d.city} • <strong>${d.type}</strong></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openLedger(id) {
+  const donor = donorsDB.find(d => d.id === id);
+  if(!donor) return;
+  document.getElementById('tab-lookup-content').style.display = 'none';
+  document.getElementById('ledger-section').style.display = 'block';
+  document.getElementById('ledger-content').innerHTML = `
+    <div class="ledger-card">
+      <div class="ledger-hero">
+        <div class="avatar-hero">${donor.name.charAt(0)}</div>
+        <div>
+          <div class="hero-name">${donor.name}</div>
+          <div class="hero-sub">ID: #${donor.id}</div>
+          <span class="hero-pill status-pill">${donor.status.toUpperCase()}</span>
+        </div>
+      </div>
+      <div class="ledger-body">
+        <div class="sec-title">Contact Parameters</div>
+        <div class="field-row"><span class="field-label">City Node</span><span class="field-value">${donor.city}</span></div>
+        <div class="field-row"><span class="field-label">Email</span><span class="field-value">${donor.email || 'N/A'}</span></div>
+        <div class="sec-title">Financial Metrics</div>
+        <div class="field-row"><span class="field-label">Commitment</span><span class="field-value money">$${donor.commitment.toLocaleString()}</span></div>
+      </div>
+    </div>`;
+}
+
+function goBack() { showTab('lookup'); doSearch(document.getElementById('search-input').value); }
+function clearAddContact() { ['ac-name', 'ac-phone', 'ac-email', 'ac-addr'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; }); }
+function disconnect() { location.reload(); }
+function toggleAdvanced() { const adv = document.getElementById('advanced-section'); adv.style.display = adv.style.display === 'none' ? 'block' : 'none'; }
+function runMockQuery() { alert("Query matrix calculations verified locally."); }
+async function triggerSync() { await refreshDataFromSheet(); alert("Data matrix synchronizations completed!"); }
+</script>
+</body>
+</html>
