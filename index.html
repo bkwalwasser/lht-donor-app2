@@ -226,6 +226,19 @@ function gisLoaded() {
   checkReady();
 }
 
+// Fallback poller — in case onload callbacks don't fire (mobile browsers)
+(function waitForLibraries() {
+  const gapiReady = typeof gapi !== 'undefined';
+  const gisReady = typeof google !== 'undefined' && google.accounts;
+
+  if (gapiReady && !gapiInited) gapiLoaded();
+  if (gisReady && !gsisInited) gisLoaded();
+
+  if (!gapiInited || !gsisInited) {
+    setTimeout(waitForLibraries, 200);
+  }
+})();
+
 function checkReady() {
   if (gapiInited && gsisInited) {
     document.getElementById('signin-btn').innerText = '🔐 Sign in with Google';
